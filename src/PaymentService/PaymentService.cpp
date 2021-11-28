@@ -182,8 +182,7 @@ bool PaymentService::call(QString call, QString token, QString cbID, QVariant ar
 
         user->setBalance(user->getBalance() - total);
 
-        auto tempBills = argMap["bills"].toList();
-        QListIterator<QVariant> billIt(tempBills);
+        QListIterator<QVariant> billIt(argMap["bills"].toList());
         QMap<QString, PaymentAccess::Bill::BillItem> map;
 
         while (billIt.hasNext())
@@ -202,8 +201,7 @@ bool PaymentService::call(QString call, QString token, QString cbID, QVariant ar
             log.timestamp = QDateTime::currentDateTime();
             log.executive = executiveUser->identityID();
             LogAccess::instance()->insertLog(log);
-            auto tempItems = bill["items"].toList();
-            QListIterator<QVariant> it(tempItems);
+            QListIterator<QVariant> it(bill["items"].toList());
             while(it.hasNext())
             {
 

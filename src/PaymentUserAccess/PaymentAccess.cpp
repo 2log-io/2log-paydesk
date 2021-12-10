@@ -71,6 +71,14 @@ QString PaymentAccess::insertProduct(Product& product)
 
 QString PaymentAccess::insertBill(Bill& bill)
 {
+    if(!bill.cartID.isEmpty())
+    {
+        QVariantMap query;
+        query["cartID"] = bill.cartID;
+        // check if there is alreay a bill with the given cartID
+        if(MongoDB::instance()->select("payment_bills", MongoDB::queryFromVariant(query).view()).length() > 0)
+            return "";
+    }
     return MongoDB::instance()->insertDocument("payment_bills", bill.toDatabase());
 }
 

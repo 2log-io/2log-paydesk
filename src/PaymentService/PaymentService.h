@@ -47,7 +47,7 @@ public:
       QVariantList billItems;
       QVariantMap toVariant()
       {
-          QVariantMap bill;
+          QVariantMap bill;          
           bill["totalBrutto"] = total;
           bill["totalNetto"] = discountTotal;
           bill["discountPercent"] = discountPercent;

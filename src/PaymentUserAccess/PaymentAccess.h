@@ -42,7 +42,6 @@ public:
             QString productName;
             QString productID;
             QString accountingCode;
-
             int normalPrice;
             int paidPrice;
             int count = 1;
@@ -69,6 +68,7 @@ public:
             items << item;
         }
 
+        QString cartID;
         QString uuid;
         QList<BillItem> items;
         QString userID;
@@ -87,6 +87,7 @@ public:
             map["normalPrice"] = normalPrice;
             map["paidPrice"] = paidPrice;
             map["cardID"] = cardID;
+            map["cartID"] = cartID;
 
             QVariantList itemList;
             QListIterator<BillItem> it(items);

@@ -150,6 +150,8 @@ bool PaymentService::call(QString call, QString token, QString cbID, QVariant ar
 
         QString cardID = argMap["cardID"].toString();
         QString userID = argMap["userID"].toString();
+        QString cartID = argMap.value("cartID", "").toString();
+
         fablabUserPtr user;
         if(userID.isEmpty())
             user = UserAccess::instance()->getUserWithCard(cardID);
@@ -183,14 +185,27 @@ bool PaymentService::call(QString call, QString token, QString cbID, QVariant ar
         user->setBalance(user->getBalance() - total);
 
         QListIterator<QVariant> billIt(argMap["bills"].toList());
-        QMap<QString, PaymentAccess::Bill::BillItem> map;
+        QList<Log> logs;
+        PaymentAccess::Bill totalBill;
+        totalBill.cartID = cartID;
 
         while (billIt.hasNext())
         {
             QVariantMap bill = billIt.next().toMap();
+
             QString accountingCode = bill["accountingCode"].toString();
             int billTotal = bill["totalNetto"].toInt();
 
+            // create a temporary bill which contains only items that
+            // belongs to the given accounting code
+            PaymentAccess::Bill partOfBill;
+            partOfBill.executiveID = executiveUser->identityID();
+            partOfBill.userID = argMap["userID"].toString();
+            partOfBill.normalPrice = argMap["total"].toInt();
+            partOfBill.paidPrice = argMap["discountTotal"].toInt();
+            partOfBill.cardID = argMap["cardID"].toString();
+
+            // prepare the log for the internal 2log accounting / cobot payment
             Log log;
             log.event = Log::BILL;
             log.price = billTotal;
@@ -200,11 +215,14 @@ bool PaymentService::call(QString call, QString token, QString cbID, QVariant ar
             log.description = accountingCode;
             log.timestamp = QDateTime::currentDateTime();
             log.executive = executiveUser->identityID();
-            LogAccess::instance()->insertLog(log);
+            log.externalType = "payment";
+
+            QMap<QString, PaymentAccess::Bill::BillItem> map;
             QListIterator<QVariant> it(bill["items"].toList());
+
+            // iterate over all items and count / collect the products
             while(it.hasNext())
             {
-
                 QVariantMap itemMap = it.next().toMap();
                 QString uuid = itemMap["uuid"].toString();
                 if(map.contains(uuid) && !uuid.isEmpty())
@@ -223,24 +241,41 @@ bool PaymentService::call(QString call, QString token, QString cbID, QVariant ar
                     map[uuid] = item;
                 }
             }
+
+            QMapIterator<QString, PaymentAccess::Bill::BillItem> internalMapIt(map);
+            while(internalMapIt.hasNext())
+            {
+                auto internalBillItem = internalMapIt.next().value();
+                partOfBill.addItem(internalBillItem);
+                totalBill.addItem(internalBillItem);
+            };
+
+            log.internalAttachment = partOfBill.toDatabase();
+            logs << log;
         }
 
-        PaymentAccess::Bill bill;
+        totalBill.executiveID = executiveUser->identityID();
+        totalBill.userID = argMap["userID"].toString();
+        totalBill.normalPrice = argMap["total"].toInt();
+        totalBill.paidPrice = argMap["discountTotal"].toInt();
+        totalBill.cardID = argMap["cardID"].toString();
+        QString uid = PaymentAccess::insertBill(totalBill);
 
-        QMapIterator<QString, PaymentAccess::Bill::BillItem> mapIt(map);
-        while(mapIt.hasNext())
+        if(uid.isEmpty())
         {
-            PaymentAccess::Bill::BillItem item = mapIt.next().value();
-            bill.addItem(item);
+            answer["errcode"] = -4;
+            answer["errstring"] = "The shopping cart has already been paid";
+            Q_EMIT response(cbID, answer);
+            return true;
         }
 
-        bill.executiveID = executiveUser->identityID();
-        bill.userID = argMap["userID"].toString();
-        bill.normalPrice = argMap["total"].toInt();
-        bill.paidPrice = argMap["discountTotal"].toInt();
-        bill.cardID = argMap["cardID"].toString();
-        PaymentAccess::insertBill(bill);
-
+        QListIterator<Log> logIt(logs);
+        while(logIt.hasNext())
+        {
+            auto log = logIt.next();
+            log.externalReference = uid;
+            LogAccess::instance()->insertLog(log);
+        }
         Q_EMIT response(cbID, answer);
         return true;
     }
@@ -348,6 +383,7 @@ QVariantMap PaymentService::prepareBill(QVariantMap argMap, QStringList extras)
     answer["errcode"] = 0;
     answer["errstring"] = "";
     answer["cardID"] = argMap["cardID"];
+    answer["cartID"] = argMap["cartID"];
     return answer;
 }
 

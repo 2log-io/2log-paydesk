@@ -182,7 +182,6 @@ bool PaymentService::call(QString call, QString token, QString cbID, QVariant ar
         answer["errcode"] = 0;
         answer["errstring"] = "";
 
-        user->setBalance(user->getBalance() - total);
 
         QListIterator<QVariant> billIt(argMap["bills"].toList());
         QList<Log> logs;
@@ -269,6 +268,9 @@ bool PaymentService::call(QString call, QString token, QString cbID, QVariant ar
             return true;
         }
 
+        user->setBalance(user->getBalance() - total);
+        answer["balance"] = user->getBalance();
+        answer["username"] = user->getName();
         QListIterator<Log> logIt(logs);
         while(logIt.hasNext())
         {

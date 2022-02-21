@@ -25,6 +25,7 @@
 #include "Database/LogAccess.h"
 #include "PaymentUserAccess/PaymentAccess.h"
 #include <QUuid>
+#include "MailClient/MailManager.h"
 
 PaymentService::PaymentService(QObject *parent) : IService(parent)
 {
@@ -271,6 +272,9 @@ bool PaymentService::call(QString call, QString token, QString cbID, QVariant ar
         user->setBalance(user->getBalance() - total);
         answer["balance"] = user->getBalance();
         answer["username"] = user->getName();
+        answer["total"] = total;
+
+        MailManager().sendMailFromTemplate(user->getEMail(),"member-payment", answer);
         QListIterator<Log> logIt(logs);
         while(logIt.hasNext())
         {
